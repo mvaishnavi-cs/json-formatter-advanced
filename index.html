@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON Refined Advanced Editor</title>
+
+<script src="https://cdn.jsdelivr.net/npm/ace-builds@1.13.1/src-noconflict/ace.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ace-builds@1.13.1/src-noconflict/mode-json.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ace-builds@1.13.1/src-noconflict/theme-github.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ace-builds@1.13.1/src-noconflict/theme-monokai.js"></script>
+
+<style>
+    * { box-sizing: border-box; }
+    
+    body {
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        margin: 0;
+        padding: 0;
+        height: 100vh; /* Full viewport height */
+        display: flex;
+        flex-direction: column;
+        color: white;
+        overflow: hidden; /* Prevent body scroll */
+    }
+
+    /* Header Styling */
+    header {
+        text-align: center;
+        padding: 15px 0;
+        flex-shrink: 0; /* Header size fixed */
+    }
+
+    h1 {
+        margin: 0;
+        font-size: 1.8rem;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    /* --- FIXED MAIN LAYOUT --- */
+    .main-container {
+        display: flex;
+        flex: 1; /* Takes up remaining height after header */
+        width: 98%;
+        margin: 0 auto 10px auto;
+        gap: 20px;
+        overflow: hidden; /* Layout stays inside screen */
+    }
+
+    /* Sidebar Fix - No more 'thongify' */
+    .sidebar {
+        width: 260px;
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        height: calc(100% - 10px); /* Fill available space */
+        overflow-y: auto; /* Scroll inside sidebar if buttons are many */
+    }
+
+    .sidebar h3 {
+        margin-top: 0;
+        color: #333;
+        font-size: 1.1rem;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+        text-align: center;
+    }
+
+    .sidebar button {
+        width: 100%;
+        margin-bottom: 8px;
+        text-align: left;
+        padding: 12px;
+        font-size: 0.85rem;
+        background: #f8f9fa;
+        color: #444;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: 0.2s ease;
+    }
+
+    .sidebar button:hover {
+        background: #667eea;
+        color: white;
+        transform: translateX(5px);
+    }
+
+    /* Main Workspace */
+    .editor-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        height: 100%;
+    }
+
+    .dropZone {
+        border: 2px dashed rgba(255,255,255,0.5);
+        padding: 12px;
+        text-align: center;
+        border-radius: 10px;
+        background: rgba(255,255,255,0.1);
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+
+    .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .controls button {
+        padding: 10px 16px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 0.85rem;
+        transition: 0.2s;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .btn-green { background: #2ecc71; color: white; }
+    .btn-blue { background: #3498db; color: white; }
+    .btn-orange { background: #e67e22; color: white; }
+    .btn-dark { background: #2c3e50; color: white; }
+
+    .editor-grid {
+        display: flex;
+        gap: 15px;
+        flex: 1; /* Editors grow to fill screen */
+        min-height: 0; /* Crucial for nested flex scrolling */
+    }
+
+    .editor-wrapper {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .editor-wrapper h3 {
+        margin: 0 0 8px 0;
+        font-size: 0.95rem;
+    }
+
+    .editor {
+        flex: 1; /* Editor takes all space in wrapper */
+        width: 100%;
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .status-bar {
+        background: rgba(0,0,0,0.2);
+        padding: 8px;
+        border-radius: 6px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 0.85rem;
+        margin-bottom: 5px;
+    }
+</style>
+</head>
+
+<body>
+
+    <header>
+        <h1>JSON Refined Advanced Editor</h1>
+    </header>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <h3>Advanced Tools</h3>
+            <button onclick="flattenJSON()">JSON Flatten</button>
+            <button onclick="unflattenJSON()">JSON Unflatten</button>
+            <button onclick="mergeJSON()">JSON Merge</button>
+            <button onclick="jsonStats()">JSON Statistics</button>
+            <button onclick="jsonTree()">JSON Tree Viewer</button>
+            <button onclick="jsonCompare()">JSON Compare</button>
+            <button onclick="searchJSON()">Search Highlight</button>
+            <button onclick="jsonToCSV()">JSON → CSV</button>
+            <button onclick="showHistory()">History Log</button>
+        </div>
+
+        <div class="editor-content">
+            <div class="dropZone" id="dropZone">Drag & Drop JSON File Here</div>
+
+            <div class="controls">
+                <button class="btn-green" onclick="processJSON()">Process JSON</button>
+                <button class="btn-blue" onclick="validateJSON()">Validate</button>
+                <button class="btn-blue" onclick="beautifyJSON()">Beautify</button>
+                <button class="btn-blue" onclick="minifyJSON()">Minify</button>
+                <button class="btn-orange" onclick="copyOutput()">Copy</button>
+                <button class="btn-orange" onclick="downloadOutput()">Download</button>
+                <button class="btn-dark" onclick="toggleTheme()">Dark / Light</button>
+            </div>
+
+            <div class="editor-grid">
+                <div class="editor-wrapper">
+                    <h3>Input JSON</h3>
+                    <div id="inputEditor" class="editor"></div>
+                </div>
+                <div class="editor-wrapper">
+                    <h3>Output JSON</h3>
+                    <div id="outputEditor" class="editor"></div>
+                </div>
+            </div>
+
+            <div id="msg" class="status-bar">System Ready</div>
+        </div>
+    </div>
+
+<script>
+    // Initialize Editors
+    var inputEditor = ace.edit("inputEditor");
+    inputEditor.session.setMode("ace/mode/json");
+    inputEditor.setTheme("ace/theme/github");
+    inputEditor.setOptions({ fontSize: "14px", showPrintMargin: false });
+
+    var outputEditor = ace.edit("outputEditor");
+    outputEditor.session.setMode("ace/mode/json");
+    outputEditor.setTheme("ace/theme/github");
+    outputEditor.setReadOnly(true);
+    outputEditor.setOptions({ fontSize: "14px", showPrintMargin: false });
+
+    let history = [];
+    function showMsg(m) { document.getElementById("msg").innerText = "Status: " + m; }
+    function saveHistory(act) { history.push(new Date().toLocaleTimeString() + " - " + act); }
+
+    function processJSON() {
+        try {
+            let obj = JSON.parse(inputEditor.getValue());
+            outputEditor.session.setMode("ace/mode/json");
+            outputEditor.setValue(JSON.stringify(obj, null, 4), -1);
+            showMsg("Processed Successfully");
+            saveHistory("Process");
+        } catch(e) { showMsg("Invalid JSON Input"); }
+    }
+
+    function validateJSON() {
+        try { JSON.parse(inputEditor.getValue()); showMsg("✔ JSON is Valid"); } 
+        catch(e) { showMsg("✘ Invalid JSON"); }
+    }
+
+    function beautifyJSON() {
+        try {
+            let obj = JSON.parse(inputEditor.getValue());
+            inputEditor.setValue(JSON.stringify(obj, null, 4), -1);
+            showMsg("Input Beautified");
+        } catch(e) { showMsg("Invalid JSON"); }
+    }
+
+    function minifyJSON() {
+        try {
+            let obj = JSON.parse(inputEditor.getValue());
+            outputEditor.setValue(JSON.stringify(obj), -1);
+            showMsg("JSON Minified");
+        } catch(e) { showMsg("Invalid JSON"); }
+    }
+
+    function jsonCompare() {
+        let second = prompt("Paste another JSON to compare:");
+        if(!second) return;
+        try {
+            let a = JSON.parse(inputEditor.getValue());
+            let b = JSON.parse(second);
+            let result = (JSON.stringify(a) === JSON.stringify(b)) ? "MATCH: Identical" : "DIFF: Different";
+            outputEditor.session.setMode("ace/mode/text");
+            outputEditor.setValue(result, -1);
+            showMsg("Comparison Complete");
+        } catch(e) { showMsg("Invalid JSON for compare"); }
+    }
+
+    function jsonTree() {
+        try {
+            let obj = JSON.parse(inputEditor.getValue());
+            outputEditor.setValue("// Tree View (Indented)\n" + JSON.stringify(obj, null, 8), -1);
+            showMsg("Tree View Generated");
+        } catch(e) { showMsg("Invalid JSON"); }
+    }
+
+    function jsonToCSV() {
+        try {
+            let json = JSON.parse(inputEditor.getValue());
+            let arr = Array.isArray(json) ? json : [json];
+            const header = Object.keys(arr[0]);
+            const csv = [header.join(','), ...arr.map(row => header.map(f => JSON.stringify(row[f])).join(','))].join('\n');
+            outputEditor.session.setMode("ace/mode/text");
+            outputEditor.setValue(csv, -1);
+            showMsg("Converted to CSV");
+        } catch(e) { showMsg("CSV Error: Needs Array of Objects"); }
+    }
+
+    function searchJSON() {
+        let term = prompt("Search in Output:");
+        if(term) outputEditor.find(term);
+    }
+
+    function flattenJSON() {
+        try {
+            let obj = JSON.parse(inputEditor.getValue());
+            let res = {};
+            function recur(cur, prop) {
+                if (Object(cur) !== cur) res[prop] = cur;
+                else for (let p in cur) recur(cur[p], prop ? prop+"."+p : p);
+            }
+            recur(obj, "");
+            outputEditor.setValue(JSON.stringify(res, null, 4), -1);
+            showMsg("Flattened");
+        } catch(e) { showMsg("Flatten Failed"); }
+    }
+
+    function unflattenJSON() {
+        try {
+            let data = JSON.parse(inputEditor.getValue());
+            let result = {};
+            for (let i in data) {
+                let keys = i.split('.');
+                keys.reduce((r, e, j) => r[e] || (r[e] = isNaN(Number(keys[j+1])) ? (keys.length-1 === j ? data[i] : {}) : []), result);
+            }
+            outputEditor.setValue(JSON.stringify(result, null, 4), -1);
+            showMsg("Unflattened");
+        } catch(e) { showMsg("Invalid Flattened JSON"); }
+    }
+
+    function jsonStats() {
+        try {
+            let obj = JSON.parse(inputEditor.getValue());
+            let stats = { "Keys": Object.keys(obj).length, "Chars": inputEditor.getValue().length, "Type": Array.isArray(obj) ? "Array" : "Object" };
+            outputEditor.setValue(JSON.stringify(stats, null, 4), -1);
+        } catch(e) { showMsg("Invalid JSON"); }
+    }
+
+    function toggleTheme() {
+        let theme = inputEditor.getTheme().includes("github") ? "ace/theme/monokai" : "ace/theme/github";
+        inputEditor.setTheme(theme);
+        outputEditor.setTheme(theme);
+    }
+
+    function copyOutput() {
+        navigator.clipboard.writeText(outputEditor.getValue());
+        showMsg("Copied!");
+    }
+
+    function downloadOutput() {
+        let blob = new Blob([outputEditor.getValue()], {type: "text/plain"});
+        let a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "output.json"; a.click();
+    }
+
+    function showHistory() {
+        outputEditor.setValue("History:\n" + history.join("\n"), -1);
+    }
+
+    // Drag & Drop
+    let dz = document.getElementById("dropZone");
+    dz.addEventListener("dragover", e => e.preventDefault());
+    dz.addEventListener("drop", e => {
+        e.preventDefault();
+        let file = e.dataTransfer.files[0];
+        let reader = new FileReader();
+        reader.onload = (evt) => { inputEditor.setValue(evt.target.result, -1); processJSON(); };
+        reader.readAsText(file);
+    });
+</script>
+</body>
+</html>
